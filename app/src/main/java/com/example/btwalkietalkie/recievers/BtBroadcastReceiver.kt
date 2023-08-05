@@ -1,12 +1,10 @@
-package com.example.btwalkietalkie
+package com.example.btwalkietalkie.recievers
 
-import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 
 class BtBroadcastReceiver(
     private val onDeviceFound: (BluetoothDevice)->Unit

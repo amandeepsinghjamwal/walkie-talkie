@@ -24,7 +24,9 @@ import com.example.btwalkietalkie.data.BtDevices
 fun MainScreen(
     state: BluetoothUiState,
     onStartScan: () -> Unit,
-    onStopScan: () -> Unit
+    onStopScan: () -> Unit,
+    onStartServer:()->Unit,
+    onDeviceClicked:(BtDevices)->Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize()
@@ -32,7 +34,7 @@ fun MainScreen(
         DeviceList(
             pairedDevices = state.pairedDevices,
             scannedDevices = state.scannedDevices,
-            onClick = {},
+            onClick = onDeviceClicked,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -46,6 +48,9 @@ fun MainScreen(
             }
             Button(onClick = onStopScan) {
                 Text(text = "Stop scan")
+            }
+            Button(onClick = onStartServer) {
+                Text(text = "Start server")
             }
         }
     }
