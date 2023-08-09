@@ -1,5 +1,6 @@
 package com.example.btwalkietalkie.controller
 
+import android.system.StructMsghdr
 import com.example.btwalkietalkie.data.BtDevices
 import com.example.btwalkietalkie.data.ConnectionResult
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +14,8 @@ interface BluetoothController {
     val error: SharedFlow<String>
 
     fun startDiscovery()
+
+    fun stopRecording()
     fun stopDiscovery()
 
     fun release()
@@ -20,4 +23,5 @@ interface BluetoothController {
     fun startBtServer():Flow<ConnectionResult>
     fun connectToDevice(devices: BtDevices):Flow<ConnectionResult>
     fun closeConnection()
+    suspend fun trySendMessage(isRecording:Boolean)
 }

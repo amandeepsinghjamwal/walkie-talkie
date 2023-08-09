@@ -1,7 +1,9 @@
 package com.example.btwalkietalkie
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.btwalkietalkie.controller.BluetoothController
 import com.example.btwalkietalkie.data.BluetoothUiState
 import com.example.btwalkietalkie.data.BtDevices
@@ -13,11 +15,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -33,11 +35,15 @@ class BtViewModel
     ){pairedDevices,scannedDevices,state->
         state.copy(
             pairedDevices=pairedDevices,
-            scannedDevices = scannedDevices
+            scannedDevices = scannedDevices,
+            msg = if (state.isConnected) state.msg else byteArrayOf()
         )
+
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000),_state.value)
 
+
     init {
+
         bluetoothController.isConnected.onEach {isConnected->
             _state.update { it.copy(isConnected = isConnected) }
         }.launchIn(viewModelScope)
@@ -67,16 +73,20 @@ class BtViewModel
             .listen()
     }
 
+
     fun disconnectFromDevice(){
+        Log.e("hereee","cancelled")
         deviceConnectionJob?.cancel()
         bluetoothController.closeConnection()
         _state.update {
             it.copy(
                 isConnecting =false,
-                isConnected = false
+                isConnected = false,
+                errorMessage = "Connection interrupted"
             )
         }
     }
+
 
     fun waitForIncomingConnection(){
         _state.update {
@@ -87,12 +97,19 @@ class BtViewModel
     private fun Flow<ConnectionResult>.listen(): Job {
         return onEach { result ->
             when(result) {
-                ConnectionResult.ConnectoionEstablished -> {
+                ConnectionResult.ConnectionEstablished -> {
                     _state.update { it.copy(
                         isConnected = true,
                         isConnecting = false,
                         errorMessage = null
                     ) }
+                }
+                is ConnectionResult.TransferSucceeded->{
+                    _state.update {
+                        it.copy(
+                            msg = result.audioData
+                        )
+                    }
                 }
                 is ConnectionResult.Error -> {
                     _state.update { it.copy(
@@ -113,6 +130,15 @@ class BtViewModel
             .launchIn(viewModelScope)
     }
 
+    fun sendMessage(isRecording:Boolean){
+        viewModelScope.launch {
+            bluetoothController.trySendMessage(isRecording)
+        }
+    }
+
+    fun stopRecording(){
+        bluetoothController.stopRecording()
+    }
     override fun onCleared() {
         super.onCleared()
         bluetoothController.release()

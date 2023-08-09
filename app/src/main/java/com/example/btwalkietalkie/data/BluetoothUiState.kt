@@ -7,5 +7,6 @@ data class BluetoothUiState(
     val pairedDevices: List<BtDevices> =  emptyList(),
     val isConnected:Boolean=false,
     val isConnecting:Boolean= false,
-    val errorMessage:String? = null
+    val errorMessage:String? = null,
+    val msg:ByteArray = byteArrayOf()
 )

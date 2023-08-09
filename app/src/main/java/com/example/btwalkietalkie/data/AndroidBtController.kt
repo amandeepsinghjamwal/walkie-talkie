@@ -25,8 +25,10 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -47,6 +49,7 @@ class AndroidBtController(
     private var serverSocket: BluetoothServerSocket? = null
     private var clientSocket: BluetoothSocket? = null
 
+    private var dataTransferService:BtTransferService? = null
 
     private val _isConnected = MutableStateFlow<Boolean>(false)
     override val isConnected: StateFlow<Boolean>
@@ -122,29 +125,54 @@ class AndroidBtController(
 
     override fun startBtServer(): Flow<ConnectionResult> {
         return flow {
-            if(!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)){
+            if (!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
                 throw SecurityException("No permission")
             }
-            serverSocket=bluetoothAdapter?.listenUsingInsecureRfcommWithServiceRecord(
+            serverSocket = bluetoothAdapter?.listenUsingRfcommWithServiceRecord(
                 "walkie-talkie",
                 UUID.fromString(SERVICE_UUID)
             )
-            var shouldLoop=true
-            while (shouldLoop){
-               clientSocket = try {
-                    serverSocket?.accept()
-                }catch (e:IOException){
-                    shouldLoop=false
-                    null
+            var shouldLoop = true
+            try {
+                while (shouldLoop) {
+                    Log.e("isLoopRunningStill","true")
+                    clientSocket = serverSocket?.accept()
+                    if (clientSocket != null) {
+                        shouldLoop = false
+                        emit(ConnectionResult.ConnectionEstablished)
+                        val service = BtTransferService(clientSocket!!)
+                        dataTransferService = service
+                        emitAll(
+                            service.listenForIncomingMessages()
+                                .map {
+                                    ConnectionResult.TransferSucceeded(it)
+                                }
+                        )
+                    }
                 }
-                emit(ConnectionResult.ConnectoionEstablished)
-                clientSocket?.let {
-                    serverSocket?.close()
-                }
+            } catch (e: IOException) {
+                Log.e("serverException", e.message.toString())
+                emit(ConnectionResult.Error("Server exception"))
             }
         }.onCompletion {
             closeConnection()
         }.flowOn(Dispatchers.IO)
+    }
+
+
+
+    override suspend fun trySendMessage(isRecording: Boolean) {
+        if(!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)){
+            return
+        }
+        if(dataTransferService==null){
+            return
+        }
+        dataTransferService?.sendMessage(isRecording)
+    }
+
+    override fun stopRecording() {
+        dataTransferService?.stopRecording()
     }
 
     override fun connectToDevice(devices: BtDevices): Flow<ConnectionResult> {
@@ -152,26 +180,34 @@ class AndroidBtController(
             if(!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)){
                 throw SecurityException("No permission")
             }
-            val bluetoothDevice = bluetoothAdapter?.getRemoteDevice(devices.address)
-
             clientSocket = bluetoothAdapter
                 ?.getRemoteDevice(devices.address)
                 ?.createRfcommSocketToServiceRecord(
                     UUID.fromString(SERVICE_UUID)
                 )
             stopDiscovery()
-//            if(bluetoothAdapter?.bondedDevices?.contains(bluetoothDevice)==false)
             clientSocket?.let {socket->
                 try {
                     socket.connect()
-                    emit(ConnectionResult.ConnectoionEstablished)
+                    emit(ConnectionResult.ConnectionEstablished)
+                    BtTransferService(socket).also {
+                        dataTransferService=it
+                        emitAll(
+                            it.listenForIncomingMessages()
+                                .map {msg->
+                                    ConnectionResult.TransferSucceeded(msg)
+                                }
+                        )
+                    }
                 }catch (e:IOException){
                     socket.close()
                     clientSocket = null
+                    Log.e("hereee","it comes")
                     emit(ConnectionResult.Error("Connection interrupted"))
                 }
             }
         }.onCompletion {
+            Log.e("hereee","it ")
             closeConnection()
         }.flowOn(Dispatchers.IO)
     }
@@ -181,8 +217,8 @@ class AndroidBtController(
         clientSocket?.close()
         serverSocket=null
         clientSocket=null
+        Log.e("heree","connection closed")
     }
-
 
     private fun updatePairedDevices() {
         if(!hasPermission(Manifest.permission.BLUETOOTH_CONNECT)){
