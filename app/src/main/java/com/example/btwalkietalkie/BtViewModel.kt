@@ -43,7 +43,6 @@ class BtViewModel
 
 
     init {
-
         bluetoothController.isConnected.onEach {isConnected->
             _state.update { it.copy(isConnected = isConnected) }
         }.launchIn(viewModelScope)
@@ -60,6 +59,7 @@ class BtViewModel
         bluetoothController.startDiscovery()
     }
     fun stopScan(){
+
         bluetoothController.stopDiscovery()
     }
 

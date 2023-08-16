@@ -13,8 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,13 +39,28 @@ import com.example.btwalkietalkie.data.BtDevices
 fun MainScreen(
     state: BluetoothUiState,
     onStartScan: () -> Unit,
-    onStopScan: () -> Unit,
+    onInfoClicked: () -> Unit,
     onStartServer: () -> Unit,
     onDeviceClicked: (BtDevices) -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Available Devices",
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+            )
+            IconButton(onClick = { onInfoClicked() }) {
+                Icon(imageVector = Icons.Default.Info, contentDescription = "")
+            }
+        }
         DeviceList(
             pairedDevices = state.pairedDevices,
             scannedDevices = state.scannedDevices,
@@ -54,7 +73,7 @@ fun MainScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Box(
-                contentAlignment= Alignment.Center,
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(0.dp)
@@ -73,7 +92,7 @@ fun MainScreen(
             }
             Divider(modifier = Modifier.fillMaxWidth(), color = Color.Gray, thickness = 1.dp)
             Box(
-                contentAlignment= Alignment.Center,
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(0.dp)
@@ -128,11 +147,7 @@ fun DeviceList(
 //
 //        }
         item {
-            Text(
-                text = "Available Devices",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.padding(10.dp)
-            )
+
         }
         items(scannedDevices) { device ->
             if (device.name != null) {
@@ -147,9 +162,11 @@ fun DeviceList(
                             .clickable { onClick(device) }
                             .padding(horizontal = 10.dp, vertical = 15.dp)
                     )
-                    Divider(modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 10.dp))
+                    Divider(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp)
+                    )
                 }
             }
 

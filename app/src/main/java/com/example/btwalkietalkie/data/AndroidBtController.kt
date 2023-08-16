@@ -107,7 +107,6 @@ class AndroidBtController(
         context.registerReceiver(onDeviceFoundReceiver, IntentFilter(BluetoothDevice.ACTION_FOUND))
         updatePairedDevices()
         bluetoothAdapter?.startDiscovery()
-
     }
 
     override fun stopDiscovery() {
