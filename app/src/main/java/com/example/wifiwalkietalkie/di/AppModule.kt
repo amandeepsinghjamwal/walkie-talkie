@@ -2,7 +2,7 @@ package com.example.wifiwalkietalkie.di
 
 import android.content.Context
 import com.example.wifiwalkietalkie.controller.WifiWalkieTalkieController
-import com.example.wifiwalkietalkie.data.WalkieTakieController
+import com.example.wifiwalkietalkie.data.WalkieTalkieController
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -16,6 +16,6 @@ object AppModule{
     @Provides
     @Singleton
     fun provideBtController(@ApplicationContext context: Context):WifiWalkieTalkieController{
-        return WalkieTakieController(context)
+        return WalkieTalkieController(context)
     }
 }

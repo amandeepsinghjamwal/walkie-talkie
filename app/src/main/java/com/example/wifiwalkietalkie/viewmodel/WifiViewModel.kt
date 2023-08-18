@@ -43,7 +43,6 @@ class WifiViewModel
     }
 
     init {
-
         wifiDirectController.isGroupOwner.onEach {isGroupOwner->
             _state.update {
                 it.copy(
@@ -61,12 +60,20 @@ class WifiViewModel
         }.launchIn(viewModelScope)
 
         wifiDirectController.isConnected.onEach { isConnected ->
+            if(!isConnected){
+                _state.update {
+                    it.copy(
+                        isTransferStarted = false
+                    )
+                }
+            }
             _state.update {
                 it.copy(
                     isConnected = isConnected
                 )
             }
         }.launchIn(viewModelScope)
+
         wifiDirectController.isWifiEnabled.onEach { isEnabled->
             _state.update {
                 it.copy(
@@ -174,4 +181,8 @@ class WifiViewModel
         }.launchIn(viewModelScope)
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        wifiDirectController.onRelease()
+    }
 }

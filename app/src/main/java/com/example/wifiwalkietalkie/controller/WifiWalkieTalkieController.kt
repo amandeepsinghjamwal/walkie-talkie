@@ -1,12 +1,14 @@
 package com.example.wifiwalkietalkie.controller
 
 import com.example.wifiwalkietalkie.data.ConnectionResult
+import com.example.wifiwalkietalkie.data.WiFiDataTransferService
 import com.example.wifiwalkietalkie.data.WifiDirectDevice
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.lang.Thread.State
 import java.net.InetAddress
+import java.net.Socket
 
 interface WifiWalkieTalkieController {
     val isWifiP2PEnabled:StateFlow<Boolean>
@@ -24,4 +26,5 @@ interface WifiWalkieTalkieController {
     fun stopRecording()
     suspend fun sendMessage()
     fun onRelease()
+    fun getLatestDeviceList():MutableList<Socket>
 }

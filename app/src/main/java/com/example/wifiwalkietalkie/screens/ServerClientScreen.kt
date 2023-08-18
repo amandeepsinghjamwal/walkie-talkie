@@ -55,7 +55,7 @@ fun ServerClientScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Available Devices",
+                    text = "Connected devices",
                     style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 )
             }

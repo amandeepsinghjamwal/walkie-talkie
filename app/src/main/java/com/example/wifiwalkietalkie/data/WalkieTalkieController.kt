@@ -11,6 +11,7 @@ import android.util.Log
 import android.widget.Toast
 import com.example.wifiwalkietalkie.controller.WifiWalkieTalkieController
 import com.example.wifiwalkietalkie.receivers.WifiDevicesBroadcastReceiver
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.io.IOException
 import java.lang.Exception
 import java.net.InetAddress
@@ -32,7 +34,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 
-class WalkieTakieController(
+class WalkieTalkieController(
     private val context: Context
 ) : WifiWalkieTalkieController {
 
@@ -75,13 +77,16 @@ class WalkieTakieController(
                         _scannedDevices.update { devices ->
                             if (scannedDevice in devices) devices else devices + scannedDevice
                         }
-                    }) { isConnected,isGroupOwner,ownerAddress ->
+                    }) { isConnected, isGroupOwner, ownerAddress ->
 
-                    Log.e("connection changed","${isConnected.toString()} ${isGroupOwner.toString()}")
+                    Log.e(
+                        "connection changed",
+                        "${isConnected.toString()} ${isGroupOwner.toString()}"
+                    )
                     _isConnected.update {
                         isConnected
                     }
-                    _isGroupOwner.update{
+                    _isGroupOwner.update {
                         isGroupOwner
                     }
                     _groupOwnerAddress.update {
@@ -94,7 +99,7 @@ class WalkieTakieController(
         }
     }
 
-    private var _groupOwnerAddress= MutableStateFlow<InetAddress?>(null)
+    private var _groupOwnerAddress = MutableStateFlow<InetAddress?>(null)
     override val groupOwnerAddress: StateFlow<InetAddress?>
         get() = _groupOwnerAddress
 
@@ -114,13 +119,16 @@ class WalkieTakieController(
     override val error: SharedFlow<String>
         get() = _error.asSharedFlow()
 
-    private var _isWifiEnabled = MutableStateFlow(true)
+    private var _isWifiEnabled = MutableStateFlow(false)
     override val isWifiEnabled: StateFlow<Boolean>
         get() = _isWifiEnabled.asStateFlow()
 
-    private var _isGroupOwner= MutableStateFlow(false)
+    private var _isGroupOwner = MutableStateFlow(false)
     override val isGroupOwner: StateFlow<Boolean>
         get() = _isGroupOwner.asStateFlow()
+
+    private val activeSockets = mutableListOf<Socket>()
+    private val activeClients = mutableListOf<WiFiDataTransferService>()
 
     @SuppressLint("MissingPermission")
     override fun startSearch() {
@@ -135,63 +143,51 @@ class WalkieTakieController(
     }
 
     @SuppressLint("MissingPermission")
-    override fun connectToDevice(device: WifiDirectDevice):Flow<ConnectionResult> {
+    override fun connectToDevice(device: WifiDirectDevice): Flow<ConnectionResult> {
         return callbackFlow {
-        val config = WifiP2pConfig().apply {
-            deviceAddress = device.address}
-            val actionListener=
-            object : WifiP2pManager.ActionListener {
-                override fun onSuccess() {
-                    try {
-                        Toast.makeText(context, "Connection Succ", Toast.LENGTH_SHORT).show()
-                        this@callbackFlow.trySend(ConnectionResult.ConnectionEstablished).isSuccess
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                            this@callbackFlow.trySend(ConnectionResult.Error("Error connecting to device")).isSuccess
-                    }
-                }
-
-                override fun onFailure(p0: Int) {
-                    Toast.makeText(context, "Connection Failed", Toast.LENGTH_SHORT).show()
-                }
-
+            val config = WifiP2pConfig().apply {
+                deviceAddress = device.address
             }
+            val actionListener =
+                object : WifiP2pManager.ActionListener {
+                    override fun onSuccess() {
+                        try {
+                            Toast.makeText(context, "Connection Successful", Toast.LENGTH_SHORT)
+                                .show()
+                            this@callbackFlow.trySend(ConnectionResult.ConnectionEstablished).isSuccess
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            this@callbackFlow.trySend(ConnectionResult.Error("Error connecting to device")).isSuccess
+                        }
+                    }
+
+                    override fun onFailure(p0: Int) {
+                        Toast.makeText(context, "Connection Failed", Toast.LENGTH_SHORT).show()
+                    }
+
+                }
             manager?.connect(wifiP2pChannel, config, actionListener)
-            awaitClose{closeConnection()}
+            awaitClose { closeConnection() }
         }.onCompletion {
             closeConnection()
         }.flowOn(Dispatchers.IO)
     }
 
-//    private fun socketConnection() {
-//        val connectionInfoListener = WifiP2pManager.ConnectionInfoListener { info ->
-//            val ownerAddress = info.groupOwnerAddress
-//            val isGroupOwner = info.isGroupOwner
-//            Toast.makeText(context, "Connection Succes", Toast.LENGTH_SHORT).show()
-//            if (isGroupOwner) {
-//                Toast.makeText(context, "groupOwner", Toast.LENGTH_SHORT).show()
-//                startServer()
-//            } else {
-//                Toast.makeText(context, "not group owner", Toast.LENGTH_SHORT).show()
-//                connectToServer(ownerAddress)
-//            }
-//        }
-//        manager?.requestConnectionInfo(wifiP2pChannel, connectionInfoListener)
-//    }
-
     override fun connectToServer(ownerAddress: InetAddress?): Flow<ConnectionResult> {
-        Log.e("connection changed","inside server")
+        Log.e("connection changed", "inside server")
         return flow {
             try {
-                clientSocket= Socket()
+                clientSocket = Socket()
                 clientSocket?.bind(null)
-                clientSocket.let {
-                    clientSocket?.connect(InetSocketAddress(ownerAddress, 8989), 500)
-                    Log.e("connection changed","socket created")
+                clientSocket.let { socket ->
+                    socket?.connect(InetSocketAddress(ownerAddress, 8989), 500)
+
+                    Log.e("connection changed", "socket created")
                     emit(ConnectionResult.ReadyForDataTransfer)
-                    dataTransferService = WiFiDataTransferService(clientSocket)
-                    Log.e("connection changed",dataTransferService.toString())
-                    dataTransferService!!.listenForIncomingMessage()
+                    dataTransferService = WiFiDataTransferService(socket,context)
+                    activeClients.add(dataTransferService!!)
+                    Log.e("connection changed", dataTransferService.toString())
+                        dataTransferService!!.listenForIncomingMessage()
                 }
             } catch (e: IOException) {
                 Log.e("connection changed", e.message.toString())
@@ -204,28 +200,30 @@ class WalkieTakieController(
     }
 
     override fun startServer(): Flow<ConnectionResult> {
-        Log.e("connection changed","server created")
+        Log.e("connection changed", "server created")
         return flow {
-            Log.e("connection changed","is server created")
+            Log.e("connection changed", "is server created")
+            var isRunning = true
             serverSocket = ServerSocket(8989)
-            var shouldLoop = true
-            try {
-                Log.e("connection changed","inside server created")
-                while (shouldLoop) {
-                    Log.e("connection changed","inside server created")
+            while (isRunning) {
+                try {
                     clientSocket = serverSocket?.accept()
                     if (clientSocket != null) {
-                        Log.e("connection changed","not null")
-                        shouldLoop = false
-                        dataTransferService = WiFiDataTransferService(clientSocket)
+                            activeSockets.add(clientSocket!!)
+                        Log.e("connection changed", "not null")
+                        dataTransferService = WiFiDataTransferService(clientSocket,context)
+                        activeClients.add(dataTransferService!!)
                         emit(ConnectionResult.ReadyForDataTransfer)
-                        dataTransferService!!.listenForIncomingMessage()
+                        CoroutineScope(Dispatchers.IO).launch {
+                            dataTransferService?.listenForIncomingMessage()
+                        }
                     }
+                } catch (e: IOException) {
+                    isRunning = false
+                    e.printStackTrace()
+                    Log.e("connection changed", "what created")
+                    emit(ConnectionResult.Error("Connection Interrupted"))
                 }
-            } catch (e: IOException) {
-                e.printStackTrace()
-                Log.e("connection changed","what created")
-                emit(ConnectionResult.Error("Connection Interrupted"))
             }
         }.onCompletion {
             closeConnection()
@@ -233,22 +231,30 @@ class WalkieTakieController(
     }
 
     override suspend fun sendMessage() {
-        if (dataTransferService == null) {
-            return
+        for (activeClient in activeClients) {
+            activeClient.sendMessage()
         }
-        dataTransferService?.sendMessage()
+    }
+
+    override fun getLatestDeviceList(): MutableList<Socket> {
+            return activeSockets
     }
 
     override fun stopRecording() {
-        dataTransferService?.stopRecording()
+        for (activeClient in activeClients) {
+            activeClient.stopRecording()
+        }
     }
 
     override fun closeConnection() {
-        Log.e("connection changed","closed")
+        Log.e("connection changed", "closed")
         manager?.removeGroup(wifiP2pChannel, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
-                // The group has been removed successfully (disconnected).
+                _isConnected.update {
+                    false
+                }
             }
+
             override fun onFailure(reason: Int) {
                 // Failed to remove the group. Handle the error.
             }

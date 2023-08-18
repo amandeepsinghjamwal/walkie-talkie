@@ -45,6 +45,7 @@ fun ConnectionScreen(
     onDisconnect: () -> Unit,
     onSendMessage: () -> Unit
 ) {
+
     var isRecording by remember {
         mutableStateOf(false)
     }

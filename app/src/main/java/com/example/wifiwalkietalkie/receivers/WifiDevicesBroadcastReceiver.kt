@@ -10,7 +10,7 @@ import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.util.Log
 import com.example.wifiwalkietalkie.data.WifiDirectDevice
-import com.example.wifiwalkietalkie.di.mapper.toWifiP2PList
+import com.example.wifiwalkietalkie.mapper.toWifiP2PList
 import java.net.InetAddress
 
 class WifiDevicesBroadcastReceiver(
